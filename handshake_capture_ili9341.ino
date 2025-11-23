@@ -119,7 +119,7 @@ unsigned long lastModeSwitch = 0;
 
 // Display refresh control
 unsigned long lastDisplayUpdate = 0;
-#define DISPLAY_UPDATE_INTERVAL 100 // Update display every 500ms
+#define DISPLAY_UPDATE_INTERVAL 50 // Update display every 500ms
 bool needsFullRedraw = true;
 bool needsContentUpdate = false;
 
@@ -1306,7 +1306,7 @@ void setup()
 {
     // Initialize TFT
     tft.begin();
-    tft.setRotation(0); // Landscape: 320x240
+    tft.setRotation(3); // Landscape: 320x240
     tft.setTextWrap(false);
 
     // Boot animation
