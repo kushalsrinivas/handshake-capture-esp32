@@ -119,8 +119,16 @@ unsigned long lastModeSwitch = 0;
 
 // Display refresh control
 unsigned long lastDisplayUpdate = 0;
-#define DISPLAY_UPDATE_INTERVAL 500 // Update display every 500ms
-bool needsRedraw = true;
+#define DISPLAY_UPDATE_INTERVAL 100 // Update display every 500ms
+bool needsFullRedraw = true;
+bool needsContentUpdate = false;
+
+// Previous values for partial updates
+uint8_t prevApCount = 0;
+uint32_t prevTotalHandshakes = 0;
+uint32_t prevTotalEapol = 0;
+uint8_t prevChannel = 1;
+DisplayMode prevMode = MODE_CAPTURE;
 
 // Current channel
 volatile uint8_t currentChannel = 1;
@@ -540,56 +548,90 @@ void matrixBootAnimation()
 }
 
 // ----- Draw Header -----
-void drawHeader()
+void drawHeader(bool forceRedraw = false)
 {
-    tft.fillRect(0, 0, SCREEN_WIDTH, HEADER_HEIGHT, COLOR_BG);
-    tft.drawFastHLine(0, HEADER_HEIGHT - 1, SCREEN_WIDTH, COLOR_HEADER);
-    tft.drawFastHLine(0, HEADER_HEIGHT - 2, SCREEN_WIDTH, COLOR_HEADER);
+    // Only redraw if values changed or forced
+    bool modeChanged = (currentMode != prevMode);
+    bool statsChanged = (apCount != prevApCount ||
+                         totalHandshakes != prevTotalHandshakes ||
+                         totalEapolFrames != prevTotalEapol ||
+                         currentChannel != prevChannel);
 
-    tft.setTextSize(2);
-    tft.setCursor(5, 5);
-    tft.setTextColor(COLOR_DANGER);
-
-    switch (currentMode)
+    if (!forceRedraw && !modeChanged && !statsChanged)
     {
-    case MODE_CAPTURE:
-        tft.print("CAPTURE");
-        break;
-    case MODE_HANDSHAKES:
-        tft.print("HANDSHAKES");
-        break;
-    case MODE_ANALYSIS:
-        tft.print("ANALYSIS");
-        break;
-    case MODE_STATS:
-        tft.print("STATISTICS");
-        break;
+        return; // Nothing changed, skip redraw
     }
 
-    tft.setTextSize(1);
-    tft.setCursor(180, 8);
-    tft.setTextColor(COLOR_SUCCESS);
-    tft.print("APs:");
-    tft.setTextColor(COLOR_TEXT);
-    tft.print(apCount);
+    // Full header redraw on mode change or force
+    if (forceRedraw || modeChanged)
+    {
+        tft.fillRect(0, 0, SCREEN_WIDTH, HEADER_HEIGHT, COLOR_BG);
+        tft.drawFastHLine(0, HEADER_HEIGHT - 1, SCREEN_WIDTH, COLOR_HEADER);
+        tft.drawFastHLine(0, HEADER_HEIGHT - 2, SCREEN_WIDTH, COLOR_HEADER);
 
-    tft.setCursor(230, 8);
-    tft.setTextColor(COLOR_WARNING);
-    tft.print("HS:");
-    tft.setTextColor(COLOR_TEXT);
-    tft.print(totalHandshakes);
+        tft.setTextSize(2);
+        tft.setCursor(5, 5);
+        tft.setTextColor(COLOR_DANGER, COLOR_BG);
 
-    tft.setCursor(180, 18);
-    tft.setTextColor(COLOR_ACCENT);
-    tft.print("CH:");
-    tft.setTextColor(COLOR_TEXT);
-    tft.print(currentChannel);
+        switch (currentMode)
+        {
+        case MODE_CAPTURE:
+            tft.print("CAPTURE   ");
+            break;
+        case MODE_HANDSHAKES:
+            tft.print("HANDSHAKES");
+            break;
+        case MODE_ANALYSIS:
+            tft.print("ANALYSIS  ");
+            break;
+        case MODE_STATS:
+            tft.print("STATISTICS");
+            break;
+        }
+        prevMode = currentMode;
+    }
 
-    tft.setCursor(230, 18);
-    tft.setTextColor(COLOR_PURPLE);
-    tft.print("EA:");
-    tft.setTextColor(COLOR_TEXT);
-    tft.print(totalEapolFrames);
+    // Update stats area (right side) - only if changed
+    if (forceRedraw || statsChanged)
+    {
+        tft.setTextSize(1);
+
+        // Clear stats area
+        tft.fillRect(175, 5, SCREEN_WIDTH - 175, 22, COLOR_BG);
+
+        tft.setCursor(180, 8);
+        tft.setTextColor(COLOR_SUCCESS, COLOR_BG);
+        tft.print("APs:");
+        tft.setTextColor(COLOR_TEXT, COLOR_BG);
+        tft.print(apCount);
+        tft.print(" ");
+
+        tft.setCursor(230, 8);
+        tft.setTextColor(COLOR_WARNING, COLOR_BG);
+        tft.print("HS:");
+        tft.setTextColor(COLOR_TEXT, COLOR_BG);
+        tft.print(totalHandshakes);
+        tft.print(" ");
+
+        tft.setCursor(180, 18);
+        tft.setTextColor(COLOR_ACCENT, COLOR_BG);
+        tft.print("CH:");
+        tft.setTextColor(COLOR_TEXT, COLOR_BG);
+        tft.print(currentChannel);
+        tft.print("  ");
+
+        tft.setCursor(230, 18);
+        tft.setTextColor(COLOR_PURPLE, COLOR_BG);
+        tft.print("EA:");
+        tft.setTextColor(COLOR_TEXT, COLOR_BG);
+        tft.print(totalEapolFrames);
+        tft.print("  ");
+
+        prevApCount = apCount;
+        prevTotalHandshakes = totalHandshakes;
+        prevTotalEapol = totalEapolFrames;
+        prevChannel = currentChannel;
+    }
 }
 
 // ----- Draw Footer -----
@@ -1286,8 +1328,13 @@ void setup()
 
     setChannel(1);
 
-    // Initial UI
-    needsRedraw = true;
+    // Initial UI - force full redraw
+    needsFullRedraw = true;
+
+    // Draw initial screen
+    drawHeader(true);
+    drawCaptureMode();
+    drawFooter();
 }
 
 // ----- Main Loop -----
@@ -1314,13 +1361,20 @@ void loop()
     {
         currentMode = (DisplayMode)((currentMode + 1) % 4);
         lastModeSwitch = now;
-        needsRedraw = true;
+        needsFullRedraw = true;
     }
 
-    // Update display only when needed and at controlled intervals
-    if (needsRedraw || (now - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL))
+    // Check if data has changed (to trigger content update)
+    bool dataChanged = (apCount != prevApCount ||
+                        totalHandshakes != prevTotalHandshakes ||
+                        totalEapolFrames != prevTotalEapol ||
+                        currentChannel != prevChannel);
+
+    // Update display intelligently
+    if (needsFullRedraw)
     {
-        drawHeader();
+        // Full screen redraw (mode change or startup)
+        drawHeader(true);
 
         switch (currentMode)
         {
@@ -1339,10 +1393,34 @@ void loop()
         }
 
         drawFooter();
-
+        needsFullRedraw = false;
         lastDisplayUpdate = now;
-        needsRedraw = false;
+    }
+    else if (dataChanged || (now - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL))
+    {
+        // Partial update - only header stats and content that changed
+        drawHeader(false); // Smart header update
+
+        // Update content area
+        switch (currentMode)
+        {
+        case MODE_CAPTURE:
+            drawCaptureMode();
+            break;
+        case MODE_HANDSHAKES:
+            drawHandshakesMode();
+            break;
+        case MODE_ANALYSIS:
+            drawAnalysisMode();
+            break;
+        case MODE_STATS:
+            drawStatsMode();
+            break;
+        }
+
+        drawFooter();
+        lastDisplayUpdate = now;
     }
 
-    delay(50);
+    delay(25);
 }
