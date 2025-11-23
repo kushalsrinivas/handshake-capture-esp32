@@ -1,0 +1,357 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                   WPA/WPA2 HANDSHAKE CAPTURE TOOL                             ║
+║                        WIRING GUIDE - ILI9341 Display                         ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  CONNECTION DIAGRAM (Software SPI - SAME AS TETRIS)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ILI9341 Display                    ESP32 Board
+    ┌──────────────┐                  ┌──────────────┐
+    │              │                  │              │
+    │   VCC ●──────┼──────────────────┼──● 3.3V      │
+    │   GND ●──────┼──────────────────┼──● GND       │
+    │              │                  │              │
+    │  MOSI ●──────┼──────────────────┼──● GPIO 23   │
+    │   SCK ●──────┼──────────────────┼──● GPIO 18   │
+    │    CS ●──────┼──────────────────┼──● GPIO 5    │
+    │    DC ●──────┼──────────────────┼──● GPIO 21   │
+    │   RST ●──────┼──────────────────┼──● GPIO 4    │
+    │              │                  │              │
+    │   LED ●──────┼──────────────────┼──● 3.3V      │ (Backlight)
+    │              │                  │              │
+    └──────────────┘                  └──────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PIN REFERENCE TABLE                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════╦════════════════╦══════════════════════════════════════════════╗
+║ Display Pin  ║ ESP32 Pin      ║ Description                                  ║
+╠══════════════╬════════════════╬══════════════════════════════════════════════╣
+║ VCC          ║ 3.3V           ║ Power supply (3.3V ONLY!)                    ║
+║ GND          ║ GND            ║ Ground                                       ║
+║ MOSI (SDA)   ║ GPIO 23        ║ Master Out Slave In (Software SPI)           ║
+║ SCK (CLK)    ║ GPIO 18        ║ Serial Clock (Software SPI)                  ║
+║ CS           ║ GPIO 5         ║ Chip Select (SPI)                            ║
+║ DC (A0)      ║ GPIO 21        ║ Data/Command select                          ║
+║ RST          ║ GPIO 4         ║ Reset                                        ║
+║ LED          ║ 3.3V           ║ Backlight (connect to 3.3V or PWM pin)       ║
+╚══════════════╩════════════════╩══════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  IMPORTANT NOTES                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+⚠️  CRITICAL WARNINGS:
+    • Use 3.3V ONLY! The ESP32 is NOT 5V tolerant
+    • Double-check all connections before powering on
+    • Incorrect voltage can permanently damage both devices
+
+💡 TIPS:
+    • Use short jumper wires for stable connections
+    • Software SPI uses any GPIO pins (flexible wiring)
+    • If display shows garbage, check DC and RST pins
+    • If display is blank, check VCC, GND, and LED connections
+    • This configuration matches your BLE Scanner and Tetris projects
+
+🔧 STANDARD PIN CONFIGURATION:
+    These pins match all your ILI9341 projects:
+    • CS = GPIO 5
+    • DC = GPIO 21
+    • RST = GPIO 4
+    • MOSI = GPIO 23
+    • SCK = GPIO 18
+
+🔌 POWER CONSIDERATIONS:
+    • ESP32 + Display draws ~200-300mA
+    • USB power is sufficient for most cases
+    • Use quality USB cable (some are power-only)
+    • For battery operation, use 3.7V LiPo with regulator
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  DISPLAY MODES & INTERFACE                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+The tool automatically cycles through 4 display modes every 8 seconds:
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ MODE 1: CAPTURE                                                           ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║ Shows live scanning results:                                             ║
+║ • Access points (SSID, encryption, channel)                              ║
+║ • Signal strength (RSSI) with color coding                               ║
+║ • Client count per AP                                                    ║
+║ • Handshake capture status                                               ║
+║ • Status indicators: ● (captured) ● (waiting) ○ (inactive)              ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ MODE 2: HANDSHAKES                                                        ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║ Details of captured handshakes:                                          ║
+║ • AP BSSID and SSID                                                      ║
+║ • Client MAC addresses                                                   ║
+║ • 4-way handshake progress bars                                          ║
+║ • EAPOL frame capture status (1/2/3/4)                                   ║
+║ • Encryption type and channel                                            ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ MODE 3: ANALYSIS                                                          ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║ Security analysis:                                                        ║
+║ • Strongest capture (best signal quality)                                ║
+║ • Handshake quality distribution                                         ║
+║   - Excellent (>-60 dBm) in green                                        ║
+║   - Good (>-75 dBm) in yellow                                            ║
+║   - Weak (<-75 dBm) in red                                               ║
+║ • Encryption type breakdown (WPA/WPA2/WPA3)                              ║
+║ • Educational notes                                                       ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ MODE 4: STATISTICS                                                        ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║ Capture statistics:                                                       ║
+║ • Total APs discovered                                                    ║
+║ • Handshakes captured                                                     ║
+║ • EAPOL frames detected                                                   ║
+║ • Beacon frames received                                                  ║
+║ • Data frames processed                                                   ║
+║ • Channel activity (top 5 busiest channels)                              ║
+║ • Runtime statistics                                                      ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  COLOR CODING REFERENCE                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    🟢 GREEN    : Success, strong signal (>-60 dBm), captured handshakes
+    🟡 YELLOW   : Warning, medium signal (-60 to -80 dBm), in progress
+    🔴 RED      : Danger, weak signal (<-80 dBm), vulnerable systems
+    🔵 CYAN     : Information, highlights, channel numbers
+    🟣 MAGENTA  : Special status, EAPOL frame indicators
+    ⚪ GRAY     : Inactive, disabled, background information
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  HEADER INDICATORS                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    APs: XX    - Number of access points discovered
+    HS: XX     - Total handshakes captured
+    CH: XX     - Current channel being monitored (1-13)
+    EA: XX     - EAPOL frames detected
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FOOTER INDICATORS                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    MODE: XXXXX    - Current display mode name
+    UP: XXXs       - Uptime in seconds
+    BCN: XXXX      - Total beacon frames received
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  UNDERSTANDING HANDSHAKE CAPTURE                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+The WPA/WPA2 4-Way Handshake Process:
+
+    [AP]                                                    [Client]
+     │                                                          │
+     │  Message 1: ANonce (Authenticator Nonce)                │
+     ├─────────────────────────────────────────────────────────>│
+     │                                                          │
+     │  Message 2: SNonce + MIC (Supplicant Nonce)             │
+     │<─────────────────────────────────────────────────────────┤
+     │                                                          │
+     │  Message 3: GTK + MIC (Group Temporal Key)              │
+     ├─────────────────────────────────────────────────────────>│
+     │                                                          │
+     │  Message 4: ACK + MIC (Acknowledgment)                  │
+     │<─────────────────────────────────────────────────────────┤
+     │                                                          │
+     │              Connection Established                      │
+     ▼                                                          ▼
+
+What You're Capturing:
+• All 4 messages contain cryptographic data
+• The MIC (Message Integrity Code) is protected by the password
+• A complete capture has all 4 EAPOL frames
+• Progress bars show which messages were captured: [■][■][■][■]
+
+When Do Handshakes Occur?
+✓ Device connects to WiFi network
+✓ Device reconnects after disconnection
+✓ Periodic reauthentication (varies by AP)
+✓ After deauthentication (natural or forced)
+
+Signal Quality Matters:
+• Excellent (>-60 dBm): All frames captured reliably
+• Good (-60 to -75 dBm): Most frames captured
+• Weak (<-75 dBm): May miss frames, incomplete captures
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TROUBLESHOOTING GUIDE                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Problem: Display shows nothing (blank screen)
+Solution:
+  □ Check VCC and GND connections
+  □ Verify LED pin is connected (backlight)
+  □ Ensure 3.3V power supply is working
+  □ Try pressing ESP32 reset button
+
+Problem: Display shows garbage/random pixels
+Solution:
+  □ Check DC (Data/Command) pin connection
+  □ Verify RST (Reset) pin connection
+  □ Check MOSI and SCK pins (Hardware SPI)
+  □ Ensure CS (Chip Select) is connected
+
+Problem: No WiFi networks detected
+Solution:
+  □ Move to area with WiFi activity
+  □ Check Serial Monitor for ESP32 errors
+  □ Verify antenna connection on ESP32
+  □ Make sure WiFi is not disabled in your area
+
+Problem: EAPOL frames detected but no complete handshakes
+Solution:
+  □ Get closer to AP for stronger signal
+  □ Wait longer - handshakes occur during auth events
+  □ Check if AP uses WPA3 (harder to capture)
+  □ Ensure all 4 frames are being captured
+
+Problem: ESP32 won't upload code
+Solution:
+  □ Hold BOOT button while uploading
+  □ Check USB cable (must be data cable, not power-only)
+  □ Try different USB port
+  □ Lower upload speed to 115200
+  □ Verify correct COM port selected
+
+Problem: Code compiles but ESP32 crashes/reboots
+Solution:
+  □ Check power supply (needs stable 3.3V)
+  □ Reduce MAX_APS if low on memory
+  □ Watch for device resets on display
+  □ Ensure all libraries are up to date
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ON-SCREEN STATUS INFORMATION                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+All status information is displayed on the TFT screen:
+  • Boot animation and initialization
+  • Real-time AP discovery and tracking
+  • Handshake capture progress
+  • EAPOL frame detection
+  • Security analysis and statistics
+
+No serial monitor needed - Everything is visual on the display!
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PERFORMANCE SPECIFICATIONS                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Channel Hopping:    250ms per channel (configurable)
+Display Update:     100ms refresh rate
+Screen Resolution:  320x240 pixels (ILI9341)
+Rotation:          Landscape (1)
+Max APs Tracked:   20 simultaneous
+Max Clients/AP:    10 per access point
+Memory Usage:      ~15-20KB RAM
+Power Draw:        ~200-300mA @ 3.3V
+
+Supported Channels: 1-13 (2.4 GHz WiFi)
+Frame Types:       Management (beacons) + Data (EAPOL)
+Encryption Types:  Open, WEP, WPA, WPA2, WPA3 (detection)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LEGAL & ETHICAL REMINDERS                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+⚖️  This tool is for EDUCATIONAL and AUTHORIZED testing purposes ONLY.
+
+✓ Legal Uses:
+  • Testing your own WiFi network security
+  • Authorized penetration testing with written permission
+  • Educational demonstrations in controlled environments
+  • Security research with proper authorization
+  • Learning about WiFi protocols and security
+
+✗ Illegal Uses:
+  • Capturing handshakes from networks without authorization
+  • Attempting to crack passwords for unauthorized access
+  • Intercepting communications you're not authorized to monitor
+  • Any use that violates computer fraud or wiretapping laws
+
+⚠️  Laws vary by jurisdiction. Always:
+  • Obtain explicit written permission
+  • Follow local, state, and federal laws
+  • Respect privacy and ethical boundaries
+  • Use knowledge to improve security, not compromise it
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  QUICK START CHECKLIST                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Hardware Setup:
+  □ ESP32 board ready
+  □ ILI9341 display connected (check wiring diagram above)
+  □ All connections verified (VCC, GND, CS, RST, DC, MOSI, SCK)
+  □ Backlight connected (LED to 3.3V)
+  □ USB cable connected
+
+Software Setup:
+  □ Arduino IDE installed
+  □ ESP32 board support installed
+  □ Adafruit GFX library installed
+  □ Adafruit ILI9341 library installed
+  □ Code uploaded successfully
+  □ Display shows boot animation
+
+Legal Compliance:
+  □ Understand legal implications in your area
+  □ Have authorization for testing
+  □ Using for educational purposes only
+  □ Will use ethically and responsibly
+
+Ready to Use:
+  □ Boot animation plays
+  □ Display shows CAPTURE mode
+  □ Channel hopping visible (CH: 1-13)
+  □ APs being detected
+  □ EAPOL frames counting when handshakes occur
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SUPPORT & RESOURCES                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Documentation:
+  • Full README: HANDSHAKE_CAPTURE_README.md
+  • Source code: handshake_capture_ili9341.ino
+  • Wiring guide: This file
+
+Learning Resources:
+  • WiFi 4-Way Handshake: IEEE 802.11i-2004 standard
+  • EAPOL Protocol: RFC 3748
+  • ESP32 WiFi Docs: docs.espressif.com
+
+For questions about:
+  • Hardware: Check ESP32 and ILI9341 datasheets
+  • Software: Review code comments and README
+  • Security: Study WiFi security protocols and best practices
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Built with: ESP32 Arduino Core + Adafruit Libraries
+Purpose: Educational WiFi security research tool
+License: Use responsibly and legally
+
+Remember: Knowledge is power. Use it wisely. 🛡️
+
+═══════════════════════════════════════════════════════════════════════════════
+
