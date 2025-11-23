@@ -117,6 +117,11 @@ DisplayMode currentMode = MODE_CAPTURE;
 unsigned long lastModeSwitch = 0;
 #define MODE_SWITCH_INTERVAL 8000
 
+// Display refresh control
+unsigned long lastDisplayUpdate = 0;
+#define DISPLAY_UPDATE_INTERVAL 500 // Update display every 500ms
+bool needsRedraw = true;
+
 // Current channel
 volatile uint8_t currentChannel = 1;
 
@@ -700,7 +705,7 @@ void drawCaptureMode()
     tft.drawFastHLine(0, y, SCREEN_WIDTH, COLOR_DIM);
     y += 2;
 
-    int maxDisplay = min(apCount, 11);
+    int maxDisplay = min(apCount, (uint8_t)11);
     for (int i = 0; i < maxDisplay; i++)
     {
         // SSID
@@ -1282,8 +1287,7 @@ void setup()
     setChannel(1);
 
     // Initial UI
-    drawHeader();
-    drawFooter();
+    needsRedraw = true;
 }
 
 // ----- Main Loop -----
@@ -1310,29 +1314,35 @@ void loop()
     {
         currentMode = (DisplayMode)((currentMode + 1) % 4);
         lastModeSwitch = now;
-        drawHeader();
+        needsRedraw = true;
     }
 
-    // Update display
-    drawHeader();
-
-    switch (currentMode)
+    // Update display only when needed and at controlled intervals
+    if (needsRedraw || (now - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL))
     {
-    case MODE_CAPTURE:
-        drawCaptureMode();
-        break;
-    case MODE_HANDSHAKES:
-        drawHandshakesMode();
-        break;
-    case MODE_ANALYSIS:
-        drawAnalysisMode();
-        break;
-    case MODE_STATS:
-        drawStatsMode();
-        break;
+        drawHeader();
+
+        switch (currentMode)
+        {
+        case MODE_CAPTURE:
+            drawCaptureMode();
+            break;
+        case MODE_HANDSHAKES:
+            drawHandshakesMode();
+            break;
+        case MODE_ANALYSIS:
+            drawAnalysisMode();
+            break;
+        case MODE_STATS:
+            drawStatsMode();
+            break;
+        }
+
+        drawFooter();
+
+        lastDisplayUpdate = now;
+        needsRedraw = false;
     }
 
-    drawFooter();
-
-    delay(100);
+    delay(50);
 }
